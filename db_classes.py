@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, Enum
-from sqlalchemy.orm import declarative_base, relationship, validates
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum
+from sqlalchemy.orm import declarative_base, validates
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
