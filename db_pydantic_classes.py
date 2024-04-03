@@ -18,6 +18,27 @@ class TypeEnum(str, Enum):
     H = 'H'
 
 class CerealBase(BaseModel):
+    name: str
+    mfr: MfrEnum
+    type: TypeEnum
+    calories: int
+    protein: int
+    fat: int
+    sodium: int
+    fiber: float
+    carbo: float
+    sugars: int
+    potass: int
+    vitamins: int
+    shelf: int
+    weight: float
+    cups: float
+    rating: float
+
+    class Config:
+        orm_mode = True
+
+class CerealInDB(BaseModel):
     id: int
     name: str
     mfr: MfrEnum
@@ -44,6 +65,9 @@ class UserBase(BaseModel):
     email: EmailStr
     password: str
     is_admin: Optional[bool] = False
+
+    class Config:
+        orm_mode = True
 
 class UserInDB(UserBase):
     id: int
