@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc
 from sqlalchemy.orm import declarative_base, validates
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import re
@@ -23,6 +23,24 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
     
     @classmethod
+    async def upsert(cls, session, id, **kwargs):
+        if id:
+            # Update existing row
+            try:
+                row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
+                for key, value in kwargs.items():
+                    setattr(row, key, value)
+            except NoResultFound:
+                raise ValueError(f"No {cls.__name__} found with id: {id}")
+        else:
+            # Create new row
+            row = cls(**kwargs)
+            session.add(row)
+        await session.commit()
+        await session.refresh(row)
+        return row
+        
+    @classmethod
     async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
         comparison_mapping = {
             'eq': getattr(cls, field) == value,
@@ -32,34 +50,50 @@ class BaseModel(Base):
             'lte': getattr(cls, field) <= value,
             'ne': getattr(cls, field) != value,
         }
+        order_mapping = {
+            'asc': getattr(cls, field).asc(),
+            'desc': getattr(cls, field).desc()
+        }
         if comparison not in comparison_mapping:
-            raise ValueError(f"Invalid comparison operator: {comparison}")
-        async with session.begin():
-            query = select(cls).where(comparison_mapping[comparison])
-            if order == 'asc':
-                query = query.order_by(getattr(cls, field))
-            else:
-                query = query.order_by(desc(getattr(cls, field)))
-            result = await session.execute(query)
-            return result.scalars().all()
+            raise ValueError(f"Invalid comparison operator: {comparison}, Valid values are: \'eq\'=equal, \'gt\'=greater than, \'lt\'=less than, \'gte\'=greater than or equal to, \'lte\'=less than or equal to, \'ne\'=not equal")
+        if order not in order_mapping:
+            raise ValueError(f"Invalid order: {order}, Valid values are: 'asc' and 'desc'")
+        
+        query = select(cls).where(comparison_mapping[comparison])
+        if order == 'asc':
+            query = query.order_by(getattr(cls, field))
+        elif order == 'desc':
+            query = query.order_by(desc(getattr(cls, field)))
+            
+        result = await session.execute(query)
+        return result.scalars().all()
     
     @classmethod
     async def get_by_field_sorted(cls, session, field, order='asc'):
-        async with session.begin():
-            result = await session.execute(select(cls).order_by(getattr(cls, field).asc() if order == 'asc' else getattr(cls, field).desc()))
-            return result.scalars().all()
+        order_mapping = {
+            'asc': getattr(cls, field).asc(),
+            'desc': getattr(cls, field).desc()
+        }
+        if order not in order_mapping:
+            raise ValueError(f"Invalid order: {order}, Valid values are: 'asc' and 'desc'")
+
+        if order == 'asc':
+            order_func = getattr(cls, field).asc()
+        elif order == 'desc':
+            order_func = getattr(cls, field).desc()
+
+        result = await session.execute(select(cls).order_by(order_func))
+        return result.scalars().all()
     
     @classmethod
     async def get_by_id(cls, session, id):
-        async with session.begin():
-            result = await session.execute(select(cls).where(cls.id == id))
-            return result.scalar()
+        result = await session.execute(select(cls).where(cls.id == id))
+        return result.scalar()
 
     @classmethod
     async def get_all(cls, session):
-        async with session.begin():
-            result = await session.execute(select(cls))
-            return result.scalars().all()
+        result = await session.execute(select(cls))
+        return result.scalars().all()
 
 class Cereal(BaseModel):
     __tablename__ = 'cereals'

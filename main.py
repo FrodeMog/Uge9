@@ -43,29 +43,40 @@ async def http_exception_handler(request, exc):
         content={"detail": exc.detail},
     )
 
-@app.get("/cereals", response_model=List[CerealBase])
+@app.get("/cereals", response_model=List[CerealInDB])
 async def get_cereals(session: AsyncSession = Depends(get_db)):
     cereals = await Cereal.get_all(session)
-    return [CerealBase.from_orm(cereal) for cereal in cereals]
+    return [CerealInDB.from_orm(cereal) for cereal in cereals]
 
-@app.get("/cereals/{cereal_id}", response_model=CerealBase)
+@app.get("/cereals/{cereal_id}", response_model=CerealInDB)
 async def get_cereal_by_id(cereal_id: int, session: AsyncSession = Depends(get_db)):
     cereal = await Cereal.get_by_id(session, cereal_id)
     if cereal is None:
         raise HTTPException(status_code=404, detail="Cereal not found")
-    return CerealBase.from_orm(cereal)
+    return CerealInDB.from_orm(cereal)
 
-@app.get("/cereals/sorted/{field}", response_model=List[CerealBase])
+@app.get("/cereals/sorted/{field}", response_model=List[CerealInDB])
 async def get_cereal_by_field_sorted(field: str, order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
     cereals = await Cereal.get_by_field_sorted(session, field, order)
-    return [CerealBase.from_orm(cereal) for cereal in cereals]
+    return [CerealInDB.from_orm(cereal) for cereal in cereals]
 
-@app.get("/cereals/{field}/{value}", response_model=List[CerealBase])
+@app.get("/cereals/{field}/{value}", response_model=List[CerealInDB])
 async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
     cereals = await Cereal.get_by_field_value(session, field, value, comparison, order)
     if not cereals:
         raise HTTPException(status_code=404, detail="Cereal not found")
-    return [CerealBase.from_orm(cereal) for cereal in cereals]
+    return [CerealInDB.from_orm(cereal) for cereal in cereals]
+
+@app.post("/cereals", response_model=CerealInDB)
+async def upsert_cereal(cereal: CerealBase, id: Optional[int] = None, session: AsyncSession = Depends(get_db)):
+    try:
+        result = await Cereal.upsert(session, id, **cereal.dict())
+        if result:
+            return CerealInDB.from_orm(result)
+        else:
+            raise HTTPException(status_code=400, detail="Upsert operation failed")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 db_utils = DatabaseUtils()
 db_utils.setup_db()
