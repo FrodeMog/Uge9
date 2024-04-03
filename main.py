@@ -55,9 +55,14 @@ async def get_cereal_by_id(cereal_id: int, session: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Cereal not found")
     return CerealBase.from_orm(cereal)
 
+@app.get("/cereals/sorted/{field}", response_model=List[CerealBase])
+async def get_cereal_by_field_sorted(field: str, order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
+    cereals = await Cereal.get_by_field_sorted(session, field, order)
+    return [CerealBase.from_orm(cereal) for cereal in cereals]
+
 @app.get("/cereals/{field}/{value}", response_model=List[CerealBase])
-async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', session: AsyncSession = Depends(get_db)):
-    cereals = await Cereal.get_by_field_value(session, field, value, comparison)
+async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
+    cereals = await Cereal.get_by_field_value(session, field, value, comparison, order)
     if not cereals:
         raise HTTPException(status_code=404, detail="Cereal not found")
     return [CerealBase.from_orm(cereal) for cereal in cereals]
