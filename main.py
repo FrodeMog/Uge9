@@ -17,6 +17,7 @@ from db_classes import Cereal
 import pymysql
 from db_connect import DatabaseConnect
 from db_utils import DatabaseUtils
+from typing import List
 #uvicorn main:app --reload
 #npx create-react-app storage-app
 #http://localhost:8000/docs
@@ -51,9 +52,23 @@ async def http_exception_handler(request, exc):
     )
 
 @app.get("/cereals", response_model=List[CerealBase])
-async def read_cereals(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    cereals = await Cereal.get_all(db)
-    return cereals
+async def get_cereals(session: AsyncSession = Depends(get_db)):
+    cereals = await Cereal.get_all(session)
+    return [CerealBase.from_orm(cereal) for cereal in cereals]
+
+@app.get("/cereals/{cereal_id}", response_model=CerealBase)
+async def get_cereal(cereal_id: int, session: AsyncSession = Depends(get_db)):
+    cereal = await Cereal.get_by_id(session, cereal_id)
+    if cereal is None:
+        raise HTTPException(status_code=404, detail="Cereal not found")
+    return CerealBase.from_orm(cereal)
+
+@app.get("/cereals/{field}/{value}", response_model=List[CerealBase])
+async def get_cereal_by_field_value(field: str, value: str, session: AsyncSession = Depends(get_db)):
+    cereals = await Cereal.get_by_field_value(session, field, value)
+    if not cereals:
+        raise HTTPException(status_code=404, detail="Cereal not found")
+    return [CerealBase.from_orm(cereal) for cereal in cereals]
 
 db_utils = DatabaseUtils()
 db_utils.setup_db()

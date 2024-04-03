@@ -23,15 +23,23 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
     
     @classmethod
-    def get_by_id(cls, session, id):
-        return session.query(cls).filter(cls.id == id).first()
+    async def get_by_field_value(cls, session, field, value):
+        async with session.begin():
+            result = await session.execute(select(cls).where(getattr(cls, field) == value))
+            return result.scalars().all()
+    
+    @classmethod
+    async def get_by_id(cls, session, id):
+        async with session.begin():
+            result = await session.execute(select(cls).where(cls.id == id))
+            return result.scalar()
 
     @classmethod
     async def get_all(cls, session):
-        result = await session.execute(select(cls))
-        return [{key: value for key, value in row.__dict__.items() if not key.startswith('_sa_')} for row in result.scalars().all()]
+        async with session.begin():
+            result = await session.execute(select(cls))
+            return result.scalars().all()
 
-    
 class Cereal(BaseModel):
     __tablename__ = 'cereals'
 
