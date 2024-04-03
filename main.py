@@ -10,81 +10,16 @@ from db_classes import *
 from typing import List, Annotated
 import uvicorn
 from werkzeug.security import check_password_hash
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+import pandas as pd
+from sqlalchemy.orm import Session
+from db_classes import Cereal 
 import pymysql
+from db_connect import DatabaseConnect
+from db_utils import DatabaseUtils
 #uvicorn main:app --reload
 #npx create-react-app storage-app
 #http://localhost:8000/docs
-
-import pandas as pd
-from sqlalchemy.orm import Session
-from db_classes import Cereal  # Import your Cereal class
-
-def setup_engine_and_session():
-    # Load database information from db_info.json
-    with open('db_info.json') as f:
-        db_info = json.load(f)
-
-    # Define the database URL
-    DATABASE_URL = f"mysql+pymysql://{db_info['username']}:{db_info['password']}@{db_info['hostname']}/{db_info['db_name']}"
-
-    # Create a SQLAlchemy engine
-    engine = create_engine(DATABASE_URL)
-
-    # Create a SQLAlchemy ORM session factory
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    return engine, SessionLocal
-
-def populate_db():
-    engine, SessionLocal = setup_engine_and_session()
-
-    # Start a new session
-    db = SessionLocal()
-
-    # Read the CSV file
-    try:
-        df = pd.read_csv('Cereal.csv', sep=';', skiprows=[1])
-    except pd.errors.ParserError:
-        print("Error while reading the CSV file.")
-
-    # Clean the data. ratings has 2 decimal points, we just take first number
-    df['rating'] = df['rating'].apply(lambda x: float(x.split('.')[0]))
-
-    # Insert the data into the database
-    db.bulk_insert_mappings(Cereal, df.to_dict('records'))
-    db.commit()
-    db.close()
-
-def init():
-    # Load database information from db_info.json
-    with open('db_info.json') as f:
-        db_info = json.load(f)
-
-    # Connect to the MySQL server (without specifying the database)
-    connection = pymysql.connect(host=db_info['hostname'],
-                                 user=db_info['username'],
-                                 password=db_info['password'])
-
-    try:
-        with connection.cursor() as cursor:
-            # Create databases (if they don't exist)
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_info['db_name']}")
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_info['test_db_name']}")
-
-        # Commit the changes
-        connection.commit()
-    finally:
-        connection.close()
-
-    engine, SessionLocal = setup_engine_and_session()
-    
-    populate_db()
-
-    # Import your Base from db_classes
-    from db_classes import Base
-    # Create all tables in the database
-    Base.metadata.create_all(bind=engine)
-
 
 app = FastAPI()
 
@@ -100,6 +35,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+async def get_db():
+    db_connect = await DatabaseConnect.connect_from_config()
+    session = await db_connect.get_new_session()
+    try:
+        yield session
+    finally:
+        await db_connect.close()
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     return JSONResponse(
@@ -107,7 +50,13 @@ async def http_exception_handler(request, exc):
         content={"detail": exc.detail},
     )
 
-init()
+@app.get("/cereals", response_model=List[CerealBase])
+async def read_cereals(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    cereals = await Cereal.get_all(db)
+    return cereals
+
+db_utils = DatabaseUtils()
+db_utils.setup_db()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)
