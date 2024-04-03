@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import re
+from sqlalchemy.future import select
 
 Base = declarative_base()
 
@@ -21,10 +22,21 @@ class BaseModel(Base):
     def __repr__(self):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
     
+    @classmethod
+    def get_by_id(cls, session, id):
+        return session.query(cls).filter(cls.id == id).first()
+
+    @classmethod
+    async def get_all(cls, session):
+        result = await session.execute(select(cls))
+        return [{key: value for key, value in row.__dict__.items() if not key.startswith('_sa_')} for row in result.scalars().all()]
+
+    
 class Cereal(BaseModel):
     __tablename__ = 'cereals'
 
-    name = Column(String, primary_key=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False, unique=True)
     mfr = Column(Enum('A', 'G', 'K', 'N', 'P', 'Q', 'R'), nullable=False)
     type = Column(Enum('C', 'H'), nullable=False)
     calories = Column(Integer, nullable=False)
@@ -52,14 +64,6 @@ class Cereal(BaseModel):
         if type not in ['C', 'H']:
             raise ValueError("Invalid type")
         return type
-    
-    @classmethod
-    def get_cereal(cls, name):
-        return cls.query.get(name)
-    
-    @classmethod
-    def get_all_cereals(cls):
-        return cls.query.all()
 
 
 class User(BaseModel):
@@ -95,19 +99,3 @@ class User(BaseModel):
     @classmethod
     def check_password(self, password):
         return check_password_hash(self.password, password)
-    
-    @classmethod
-    def get_user(cls, username):
-        return cls.query.filter_by(username=username).first()
-    
-    @classmethod
-    def get_all_users(cls):
-        return cls.query.all()
-    
-    @classmethod
-    def get_user_by_email(cls, email):
-        return cls.query.filter_by(email=email).first()
-    
-    @classmethod
-    def get_user_by_id(cls, user_id):
-        return cls.query.get(user_id)
