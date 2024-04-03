@@ -1,1 +1,8 @@
 python==3.12.2
+pymysql==1.1.0
+sqlalchemy==2.0.28
+werkzeug==3.0.1
+aiomysql==0.2.0
+fastapi==0.110.0
+uvicorn==0.29.0
+pydantic==1.10.14
