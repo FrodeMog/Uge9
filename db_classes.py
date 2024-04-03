@@ -23,9 +23,19 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
     
     @classmethod
-    async def get_by_field_value(cls, session, field, value):
+    async def get_by_field_value(cls, session, field, value, comparison: str = 'eq'):
+        comparison_mapping = {
+            'eq': getattr(cls, field) == value,
+            'gt': getattr(cls, field) > value,
+            'lt': getattr(cls, field) < value,
+            'gte': getattr(cls, field) >= value,
+            'lte': getattr(cls, field) <= value,
+            'ne': getattr(cls, field) != value,
+        }
+        if comparison not in comparison_mapping:
+            raise ValueError(f"Invalid comparison operator: {comparison}")
         async with session.begin():
-            result = await session.execute(select(cls).where(getattr(cls, field) == value))
+            result = await session.execute(select(cls).where(comparison_mapping[comparison]))
             return result.scalars().all()
     
     @classmethod

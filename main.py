@@ -57,15 +57,15 @@ async def get_cereals(session: AsyncSession = Depends(get_db)):
     return [CerealBase.from_orm(cereal) for cereal in cereals]
 
 @app.get("/cereals/{cereal_id}", response_model=CerealBase)
-async def get_cereal(cereal_id: int, session: AsyncSession = Depends(get_db)):
+async def get_cereal_by_id(cereal_id: int, session: AsyncSession = Depends(get_db)):
     cereal = await Cereal.get_by_id(session, cereal_id)
     if cereal is None:
         raise HTTPException(status_code=404, detail="Cereal not found")
     return CerealBase.from_orm(cereal)
 
 @app.get("/cereals/{field}/{value}", response_model=List[CerealBase])
-async def get_cereal_by_field_value(field: str, value: str, session: AsyncSession = Depends(get_db)):
-    cereals = await Cereal.get_by_field_value(session, field, value)
+async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', session: AsyncSession = Depends(get_db)):
+    cereals = await Cereal.get_by_field_value(session, field, value, comparison)
     if not cereals:
         raise HTTPException(status_code=404, detail="Cereal not found")
     return [CerealBase.from_orm(cereal) for cereal in cereals]
