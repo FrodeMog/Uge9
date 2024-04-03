@@ -46,38 +46,13 @@ def populate_db():
         df = pd.read_csv('Cereal.csv', sep=';', skiprows=[1])
     except pd.errors.ParserError:
         print("Error while reading the CSV file.")
-        
-    # Iterate over the rows of the DataFrame
-    for index, row in df.iterrows():
-        # Clean the 'rating' value
-        rating = float(row['rating'].replace('.', '', 1))
-        # Create a new Cereal object
-        cereal = Cereal(
-            name=row['name'],
-            mfr=row['mfr'],
-            type=row['type'],
-            calories=row['calories'],
-            protein=row['protein'],
-            fat=row['fat'],
-            sodium=row['sodium'],
-            fiber=row['fiber'],
-            carbo=row['carbo'],
-            sugars=row['sugars'],
-            potass=row['potass'],
-            vitamins=row['vitamins'],
-            shelf=row['shelf'],
-            weight=row['weight'],
-            cups=row['cups'],
-            rating=rating  # Use the cleaned 'rating' value
-        )
 
-        # Add the Cereal object to the session
-        db.add(cereal)
+    # Clean the data. ratings has 2 decimal points, we just take first number
+    df['rating'] = df['rating'].apply(lambda x: float(x.split('.')[0]))
 
-    # Commit the session
+    # Insert the data into the database
+    db.bulk_insert_mappings(Cereal, df.to_dict('records'))
     db.commit()
-
-    # Close the session
     db.close()
 
 def init():
