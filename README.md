@@ -55,7 +55,7 @@ Day 1|  | 6h | Up to 2h extra
 -| Debugging + Cleanup  | 1h | Day 1
 Day 2|  | 6h | Up to 2h extra
 ✅| POST update object ID or add new object  | 2h | Day 2
--| DELETE endpoint  | 2h | Day 2
+✅| DELETE endpoint  | 2h | Day 2
 -| Add users to database  | 30m | Day 2
 -| User rights for POST/DELETE  | 1h | Day 2
 Day 3|  | 6h | Up to 2h extra

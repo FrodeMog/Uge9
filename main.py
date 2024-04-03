@@ -77,6 +77,14 @@ async def upsert_cereal(cereal: CerealBase, id: Optional[int] = None, session: A
             raise HTTPException(status_code=400, detail="Upsert operation failed")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@app.delete("/cereals/{cereal_id}")
+async def delete_cereal(cereal_id: int, session: AsyncSession = Depends(get_db)):
+    try:
+        result = await Cereal.delete(session, cereal_id)
+        return {"message": f"Cereal with id {cereal_id} deleted successfully"}
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Cereal not found")
 
 db_utils = DatabaseUtils()
 db_utils.setup_db()

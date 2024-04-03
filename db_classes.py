@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc, delete, update
 from sqlalchemy.orm import declarative_base, validates
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -26,19 +26,27 @@ class BaseModel(Base):
     async def upsert(cls, session, id, **kwargs):
         if id:
             # Update existing row
-            try:
-                row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
-                for key, value in kwargs.items():
-                    setattr(row, key, value)
-            except NoResultFound:
-                raise ValueError(f"No {cls.__name__} found with id: {id}")
+            stmt = update(cls).where(cls.id == id).values(**kwargs)
+            await session.execute(stmt)
         else:
             # Create new row
             row = cls(**kwargs)
             session.add(row)
         await session.commit()
-        await session.refresh(row)
+
+        # Refresh the row to get the updated or created instance
+        row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
         return row
+
+    @classmethod
+    async def delete(cls, session, id):
+        try:
+            row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
+            await session.delete(row)
+            await session.commit()
+            return row
+        except NoResultFound:
+            raise ValueError(f"No {cls.__name__} found with id: {id}")
         
     @classmethod
     async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
@@ -87,8 +95,11 @@ class BaseModel(Base):
     
     @classmethod
     async def get_by_id(cls, session, id):
-        result = await session.execute(select(cls).where(cls.id == id))
-        return result.scalar()
+        try:
+            result = await session.execute(select(cls).where(cls.id == id))
+            return result.scalar_one()
+        except NoResultFound:
+            raise ValueError(f"No {cls.__name__} found with id: {id}")
 
     @classmethod
     async def get_all(cls, session):
