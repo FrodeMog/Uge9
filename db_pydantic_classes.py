@@ -3,6 +3,7 @@ from typing import Optional
 from enum import Enum
 from datetime import datetime
 
+
 class MfrEnum(str, Enum):
     A = 'A'
     G = 'G'
@@ -17,7 +18,8 @@ class TypeEnum(str, Enum):
     H = 'H'
 
 class CerealBase(BaseModel):
-    name: str = Field(..., max_length=50)
+    id: int
+    name: str
     mfr: MfrEnum
     type: TypeEnum
     calories: int
@@ -34,6 +36,9 @@ class CerealBase(BaseModel):
     cups: float
     rating: float
 
+    class Config:
+        orm_mode = True
+
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, regex="^[A-Za-z0-9_]+$")
     email: EmailStr
@@ -42,6 +47,9 @@ class UserBase(BaseModel):
 
 class UserInDB(UserBase):
     id: int
+    username: str
+    email: EmailStr
+    is_admin: bool
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
