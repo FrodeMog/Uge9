@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc
 from sqlalchemy.orm import declarative_base, validates
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -23,7 +23,7 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
     
     @classmethod
-    async def get_by_field_value(cls, session, field, value, comparison: str = 'eq'):
+    async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
         comparison_mapping = {
             'eq': getattr(cls, field) == value,
             'gt': getattr(cls, field) > value,
@@ -35,7 +35,18 @@ class BaseModel(Base):
         if comparison not in comparison_mapping:
             raise ValueError(f"Invalid comparison operator: {comparison}")
         async with session.begin():
-            result = await session.execute(select(cls).where(comparison_mapping[comparison]))
+            query = select(cls).where(comparison_mapping[comparison])
+            if order == 'asc':
+                query = query.order_by(getattr(cls, field))
+            else:
+                query = query.order_by(desc(getattr(cls, field)))
+            result = await session.execute(query)
+            return result.scalars().all()
+    
+    @classmethod
+    async def get_by_field_sorted(cls, session, field, order='asc'):
+        async with session.begin():
+            result = await session.execute(select(cls).order_by(getattr(cls, field).asc() if order == 'asc' else getattr(cls, field).desc()))
             return result.scalars().all()
     
     @classmethod
