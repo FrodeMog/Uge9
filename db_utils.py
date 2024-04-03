@@ -4,6 +4,7 @@ import pymysql
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db_classes import *
+from sqlalchemy import inspect
 
 class DatabaseUtils:
 
@@ -22,10 +23,11 @@ class DatabaseUtils:
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         self.engine = engine
         self.SessionLocal = SessionLocal
+        self.create_schema()
 
     def setup_db(self):
-        self.clean_db()
-        self.create_schemas_and_tables()
+        self.drop_tables()
+        self.create_tables()
         self.populate_db()
 
     def populate_db(self):
@@ -45,11 +47,13 @@ class DatabaseUtils:
         db.commit()
         db.close()
 
-    def clean_db(self):
+    def drop_tables(self):
         from db_classes import Base
-        Base.metadata.drop_all(bind=self.engine)
+        if inspect(self.engine).has_table('cereals'):
+            # Drop all tables in the database
+            Base.metadata.drop_all(bind=self.engine)
 
-    def create_schemas_and_tables(self):
+    def create_schema(self):
         # Load database information from db_info.json
         with open('db_info.json') as f:
             db_info = json.load(f)
@@ -69,7 +73,8 @@ class DatabaseUtils:
             connection.commit()
         finally:
             connection.close()
-
+        
+    def create_tables(self):
         from db_classes import Base
         # Create all tables in the database
         Base.metadata.create_all(bind=self.engine)
