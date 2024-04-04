@@ -1,9 +1,7 @@
-pymysql==1.1.0
-sqlalchemy==2.0.28
-werkzeug==3.0.1
-aiomysql==0.2.0
-fastapi==0.110.0
-uvicorn==0.29.0
+fastapi==0.110.1
+pandas==1.5.3
 pydantic==1.10.14
-email-validator==2.1.1
-pandas==2.2.1
+PyMySQL==1.1.0
+SQLAlchemy==2.0.28
+uvicorn==0.29.0
+Werkzeug==3.0.2
