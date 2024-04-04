@@ -6,6 +6,7 @@ from datetime import datetime
 import re
 from sqlalchemy.future import select
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 Base = declarative_base()
 
@@ -24,65 +25,37 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
         
     @classmethod
-    async def upsert(cls, session, username, password, id=None, **kwargs):
-        try:
-            user = await User.authenticate_admin(User, session, username, password)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        if id:
-            # Update existing row
-            stmt = update(cls).where(cls.id == id).values(**kwargs)
-            await session.execute(stmt)
-        else:
-            # Check if a row with the same name already exists
-            name = kwargs.get('name')
-            existing_row = (await session.execute(select(cls).where(cls.name == name))).scalar_one_or_none()
-            if existing_row:
-                raise ValueError(f"A row with the name '{name}' already exists.")
-            
-            # Create new row
-            row = cls(**kwargs)
-            session.add(row)
-            await session.commit()
-            return row
-
-        # Refresh the row to get the updated instance
-        row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
-        return row
-        
-    @classmethod
     async def add(cls, session, **kwargs):
+        # Check if a row with the same name already exists
+        name = kwargs.get('name')
+        existing_row = (await session.execute(select(cls).where(cls.name == name))).scalar_one_or_none()
+        if existing_row:
+            raise ValueError(f"A row with the name '{name}' already exists.")
+        
+        # Create new row
         row = cls(**kwargs)
         session.add(row)
         await session.commit()
         return row
-    
-    async def authenticate(self, session, username, password):
-        user = (await session.execute(select(User).where(User.username == username))).scalar_one_or_none()
-        if not user:
-            raise ValueError("Invalid username or password")
-        if not check_password_hash(user.password, password):
-            raise ValueError("Invalid username or password")
-        return user
-    
-    async def authenticate_admin(self, session, username, password):
-        user = (await session.execute(select(User).where(User.username == username))).scalar_one_or_none()
-        if not user:
-            raise ValueError("Invalid username or password")
-        if not check_password_hash(user.password, password):
-            raise ValueError("Invalid username or password")
-        if not user.is_admin:
-            raise ValueError("User is not an admin")
-        return user
+
+    @classmethod
+    async def update(cls, session, id, **kwargs):
+        # Check if a row with the given id exists
+        existing_row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
+        if not existing_row:
+            raise ValueError(f"No row found with id: {id}")
+
+        # Update existing row
+        stmt = update(cls).where(cls.id == id).values(**kwargs)
+        await session.execute(stmt)
+        await session.commit()
+
+        # Refresh the row to get the updated instance
+        row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
+        return row
     
     @classmethod
-    async def delete(cls, session, id, username, password):
-        try:
-            user = await User.authenticate_admin(User, session, username, password)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
+    async def delete(cls, session, id):
         try:
             row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
             await session.delete(row)
@@ -91,7 +64,14 @@ class BaseModel(Base):
             raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id: {id}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-        
+
+    @classmethod
+    async def upsert(cls, session, id=None, **kwargs):
+        if id:
+            return await cls.update(session, id, **kwargs)
+        else:
+            return await cls.add(session, **kwargs)
+     
     @classmethod
     async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
         comparison_mapping = {
@@ -215,6 +195,13 @@ class User(BaseModel):
         return user
     
     @classmethod
+    async def authenticate(cls, username: str, password: str, session: AsyncSession):
+        user = await session.execute(select(cls).where(cls.username == username))
+        user = user.scalars().first()
+        if user and user.check_password(password):
+            return user
+        return None
+    
     def check_password(self, password):
         if not isinstance(self.password, str):
             raise ValueError("Invalid password")
