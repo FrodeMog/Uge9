@@ -25,21 +25,27 @@ In this assignment I will create a basic CRUD API using RESTful architecture. In
 ##### Technologies
 Status | Technologies |
 :---:| --- |
--| Python
--| FastAPI
--| SQLAlchemy
--| MySQL 
+✅| Python
+✅| FastAPI
+✅| SQLAlchemy
+✅| MySQL 
+Extras:
+⚠️| React 
 
 ##### Featurelist
 Status | Feature |
 :---:| --- |
--| Database of Cereal
--| GET endpoints with exact filtering
--| GET endpoints with Less/More than filtering
--| POST endpoints for Update + Add
--| DELETE endpoints
--| Users: Username/Password checks for POST/DELETE
--| GET endpoint for Pictures
+✅| Database of Cereal
+✅| GET endpoints with exact filtering
+✅| GET endpoints with Less/More than filtering
+✅| POST endpoints for Update + Add
+✅| DELETE endpoints
+✅| Users: Username/Password checks for POST/DELETE
+✅| GET endpoint for Pictures
+Extras:
+⚠️| React Login Page
+⚠️| React Cereal list
+⚠️| React Admin operations: Add, Delete, Update
 
 ##### Basic requirements - Time estimates
 Status | Requirement | Time | Comment
@@ -60,12 +66,12 @@ Day 2|  | 6h | Up to 2h extra
 ✅| User rights for POST/DELETE  | 1h | Day 2
 Day 3|  | 6h | Up to 2h extra
 ✅| GET for pictures tied to IDs | 3h | Day 3
--| Debug / Cleanup / Documentation | 3h | Day 3
+⚠️| Debug / Cleanup / Documentation | 3h | Day 3
 Total |  | 20h | 3 Days
 
 ##### Extra Advanced requirements
 Status | Requirement | Time | Comment
 :---:| --- | --- | ---
 ✅| (JWT) JSON Web Token authentication | 4h | Day x
--| React Front-end for login + endpoints | 4h | Day x
--| React Front-end for displaying picturs of cereal | 4h | Day x
+⚠️| React Front-end for login + endpoints | 4h | Day x
+⚠️| React Front-end for displaying picturs of cereal | 4h | Day x
