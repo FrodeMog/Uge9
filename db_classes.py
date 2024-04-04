@@ -1,12 +1,29 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc, delete, update
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc, delete, update, inspect
 from sqlalchemy.orm import declarative_base, validates
-from sqlalchemy.exc import SQLAlchemyError, NoResultFound
+from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import re
 from sqlalchemy.future import select
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from functools import wraps
+
+def error_handler(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        session = kwargs.get('session')
+        try:
+            return await func(*args, **kwargs)
+        except HTTPException as e:
+            raise e
+        except IntegrityError as e:
+            if session:
+                await session.rollback()
+            raise HTTPException(status_code=400, detail="A row with the same unique field value already exists.")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    return wrapper
 
 Base = declarative_base()
 
@@ -23,15 +40,10 @@ class BaseModel(Base):
 
     def __repr__(self):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
-        
+
     @classmethod
+    @error_handler
     async def add(cls, session, **kwargs):
-        # Check if a row with the same name already exists
-        name = kwargs.get('name')
-        existing_row = (await session.execute(select(cls).where(cls.name == name))).scalar_one_or_none()
-        if existing_row:
-            raise ValueError(f"A row with the name '{name}' already exists.")
-        
         # Create new row
         row = cls(**kwargs)
         session.add(row)
@@ -39,11 +51,12 @@ class BaseModel(Base):
         return row
 
     @classmethod
+    @error_handler
     async def update(cls, session, id, **kwargs):
         # Check if a row with the given id exists
         existing_row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
         if not existing_row:
-            raise ValueError(f"No row found with id: {id}")
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id {id}")
 
         # Update existing row
         stmt = update(cls).where(cls.id == id).values(**kwargs)
@@ -53,27 +66,30 @@ class BaseModel(Base):
         # Refresh the row to get the updated instance
         row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
         return row
-    
-    @classmethod
-    async def delete(cls, session, id):
-        try:
-            row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
-            await session.delete(row)
-            await session.commit()
-        except NoResultFound:
-            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id: {id}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
 
     @classmethod
+    @error_handler
+    async def delete(cls, session, id):
+        row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id {id}")
+        await session.delete(row)
+        await session.commit()
+
+    @classmethod
+    @error_handler
     async def upsert(cls, session, id=None, **kwargs):
         if id:
             return await cls.update(session, id, **kwargs)
         else:
             return await cls.add(session, **kwargs)
-     
+
     @classmethod
+    @error_handler
     async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
+        if not hasattr(cls, field):
+            raise HTTPException(status_code=400, detail=f"Invalid field: {field}")
+        
         comparison_mapping = {
             'eq': getattr(cls, field) == value,
             'gt': getattr(cls, field) > value,
@@ -82,32 +98,57 @@ class BaseModel(Base):
             'lte': getattr(cls, field) <= value,
             'ne': getattr(cls, field) != value,
         }
+        comparison_descriptions = {
+            'eq': 'equal',
+            'gt': 'greater than',
+            'lt': 'less than',
+            'gte': 'greater than or equal to',
+            'lte': 'less than or equal to',
+            'ne': 'not equal',
+        }
+        
         order_mapping = {
             'asc': getattr(cls, field).asc(),
             'desc': getattr(cls, field).desc()
         }
+        order_descriptions = {
+            'asc': 'ascending',
+            'desc': 'descending',
+        }
+        
         if comparison not in comparison_mapping:
-            raise ValueError(f"Invalid comparison operator: {comparison}, Valid values are: \'eq\'=equal, \'gt\'=greater than, \'lt\'=less than, \'gte\'=greater than or equal to, \'lte\'=less than or equal to, \'ne\'=not equal")
+            raise HTTPException(status_code=400, detail=f"Invalid comparison operator: {comparison}, Valid values are: {', '.join(f'{k}={v}' for k, v in comparison_descriptions.items())}")
         if order not in order_mapping:
-            raise ValueError(f"Invalid order: {order}, Valid values are: 'asc' and 'desc'")
+            raise HTTPException(status_code=400, detail=f"Invalid order: {order}, Valid values are: {', '.join(f'{k}={v}' for k, v in order_descriptions.items())}")
         
         query = select(cls).where(comparison_mapping[comparison])
         if order == 'asc':
             query = query.order_by(getattr(cls, field))
         elif order == 'desc':
             query = query.order_by(desc(getattr(cls, field)))
-            
+        
         result = await session.execute(query)
-        return result.scalars().all()
-    
+        results = result.scalars().all()
+
+        if not results:
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with field {field} {comparison_descriptions[comparison]} {value}")
+        return results
+
     @classmethod
+    @error_handler
     async def get_by_field_sorted(cls, session, field, order='asc'):
+        if not hasattr(cls, field):
+            raise HTTPException(status_code=400, detail=f"Invalid field: {field}")
         order_mapping = {
             'asc': getattr(cls, field).asc(),
             'desc': getattr(cls, field).desc()
         }
+        order_descriptions = {
+            'asc': 'ascending',
+            'desc': 'descending',
+        }
         if order not in order_mapping:
-            raise ValueError(f"Invalid order: {order}, Valid values are: 'asc' and 'desc'")
+            raise HTTPException(status_code=400, detail=f"Invalid order: {order}, Valid values are: {', '.join(f'{k}={v}' for k, v in order_descriptions.items())}")
 
         if order == 'asc':
             order_func = getattr(cls, field).asc()
@@ -115,20 +156,25 @@ class BaseModel(Base):
             order_func = getattr(cls, field).desc()
 
         result = await session.execute(select(cls).order_by(order_func))
+        if not result.scalars().all():
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found")
         return result.scalars().all()
     
     @classmethod
+    @error_handler
     async def get_by_id(cls, session, id):
-        try:
-            result = await session.execute(select(cls).where(cls.id == id))
-            return result.scalar_one()
-        except NoResultFound:
-            raise ValueError(f"No {cls.__name__} found with id: {id}")
+        result = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id {id}")
+        return result
 
     @classmethod
+    @error_handler
     async def get_all(cls, session):
-        result = await session.execute(select(cls))
-        return result.scalars().all()
+        result = (await session.execute(select(cls))).scalars().all()
+        if not result:
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found")
+        return result
 
 class Cereal(BaseModel):
     __tablename__ = 'cereals'

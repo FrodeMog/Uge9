@@ -113,48 +113,48 @@ async def http_exception_handler(request, exc):
 
 @app.get("/cereals", response_model=List[CerealInDB])
 async def get_cereals(session: AsyncSession = Depends(get_db)):
-    cereals = await Cereal.get_all(session)
-    return [CerealInDB.from_orm(cereal) for cereal in cereals]
+    result = await Cereal.get_all(session)
+    if result:
+        return [CerealInDB.from_orm(cereal) for cereal in result]
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
 
-@app.get("/cereals/{cereal_id}", response_model=CerealInDB)
-async def get_cereal_by_id(cereal_id: int, session: AsyncSession = Depends(get_db)):
-    cereal = await Cereal.get_by_id(session, cereal_id)
-    if cereal is None:
-        raise HTTPException(status_code=404, detail="Cereal not found")
-    return CerealInDB.from_orm(cereal)
+@app.get("/cereals/{id}", response_model=CerealInDB)
+async def get_cereal_by_id(id: int, session: AsyncSession = Depends(get_db)):
+    cereal = await Cereal.get_by_id(session, id)
+    if cereal:
+        return CerealInDB.from_orm(cereal)
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
 
 @app.get("/cereals/sorted/{field}", response_model=List[CerealInDB])
 async def get_cereal_by_field_sorted(field: str, order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
-    cereals = await Cereal.get_by_field_sorted(session, field, order)
-    return [CerealInDB.from_orm(cereal) for cereal in cereals]
+    result = await Cereal.get_by_field_sorted(session, field, order)
+    if result:
+        return [CerealInDB.from_orm(cereal) for cereal in result]
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
 
 @app.get("/cereals/{field}/{value}", response_model=List[CerealInDB])
 async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
-    cereals = await Cereal.get_by_field_value(session, field, value, comparison, order)
-    if not cereals:
-        raise HTTPException(status_code=404, detail="Cereal not found")
-    return [CerealInDB.from_orm(cereal) for cereal in cereals]
+    result = await Cereal.get_by_field_value(session, field, value, comparison, order)
+    if result:
+        return [CerealInDB.from_orm(cereal) for cereal in result]
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
 
 @app.post("/cereals", response_model=CerealInDB)
 async def upsert_cereal(cereal: CerealBase, current_user: User = Depends(get_current_admin_user), id: Optional[int] = None, session: AsyncSession = Depends(get_db)):
-    try:
-        result = await Cereal.upsert(session=session, id=id, **cereal.dict())
-        if result:
-            return CerealInDB.from_orm(result)
-        else:
-            raise HTTPException(status_code=400, detail="Upsert operation failed")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    result = await Cereal.upsert(session=session, id=id, **cereal.dict())
+    if result:
+        return CerealInDB.from_orm(result)
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
     
-@app.delete("/cereals/{cereal_id}")
+@app.delete("/cereals/{id}")
 async def delete_cereal(id: int, current_user: User = Depends(get_current_admin_user), session: AsyncSession = Depends(get_db)):
-    try:
-        await Cereal.delete(session, id)
-        return {"message": f"Cereal with id {id} deleted successfully"}
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail=f"No Cereal found with id: {id}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    await Cereal.delete(session, id)
+    return {"message": f"Cereal with id {id} deleted successfully"}
 
 db_utils = DatabaseUtils()
 db_utils.setup_db()
