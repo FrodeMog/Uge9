@@ -79,12 +79,17 @@ async def upsert_cereal(cereal: CerealBase, id: Optional[int] = None, session: A
         raise HTTPException(status_code=400, detail=str(e))
     
 @app.delete("/cereals/{cereal_id}")
-async def delete_cereal(cereal_id: int, session: AsyncSession = Depends(get_db)):
+async def delete_cereal(cereal_id: int, username: str, password: str, session: AsyncSession = Depends(get_db)):
     try:
-        result = await Cereal.delete(session, cereal_id)
+        result = await Cereal.delete(session, id=cereal_id, username=username, password=password)
         return {"message": f"Cereal with id {cereal_id} deleted successfully"}
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Cereal not found")
+    except ValueError as e:
+        if "Invalid username or password" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        elif "User is not an admin" in str(e):
+            raise HTTPException(status_code=403, detail="User is not an admin")
+        else:
+            raise HTTPException(status_code=404, detail="Cereal not found")
 
 db_utils = DatabaseUtils()
 db_utils.setup_db()

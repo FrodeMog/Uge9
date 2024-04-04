@@ -5,6 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import re
 from sqlalchemy.future import select
+from fastapi import HTTPException
 
 Base = declarative_base()
 
@@ -51,16 +52,40 @@ class BaseModel(Base):
         session.add(row)
         await session.commit()
         return row
-
+    
+    async def authenticate(self, session, username, password):
+        user = (await session.execute(select(User).where(User.username == username))).scalar_one_or_none()
+        if not user:
+            raise ValueError("Invalid username or password")
+        if not check_password_hash(user.password, password):
+            raise ValueError("Invalid username or password")
+        return user
+    
+    async def authenticate_admin(self, session, username, password):
+        user = (await session.execute(select(User).where(User.username == username))).scalar_one_or_none()
+        if not user:
+            raise ValueError("Invalid username or password")
+        if not check_password_hash(user.password, password):
+            raise ValueError("Invalid username or password")
+        if not user.is_admin:
+            raise ValueError("User is not an admin")
+        return user
+    
     @classmethod
-    async def delete(cls, session, id):
+    async def delete(cls, session, id, username, password):
+        try:
+            user = await User.authenticate_admin(User, session, username, password)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         try:
             row = (await session.execute(select(cls).where(cls.id == id))).scalar_one()
             await session.delete(row)
             await session.commit()
-            return row
         except NoResultFound:
-            raise ValueError(f"No {cls.__name__} found with id: {id}")
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with id: {id}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
         
     @classmethod
     async def get_by_field_value(cls, session, field, value, comparison: str = 'eq', order: str = 'asc'):
@@ -180,10 +205,12 @@ class User(BaseModel):
         return email
     
     @classmethod
-    def create_user(cls, username, email, password, is_admin=False):
-        user = cls(username=username, email=email, password=generate_password_hash(password), is_admin=is_admin)
+    def create_user(cls, username, password, email, is_admin=False):
+        user = cls(username=username, password=generate_password_hash(password), email=email, is_admin=is_admin)
         return user
     
     @classmethod
     def check_password(self, password):
+        if not isinstance(self.password, str):
+            raise ValueError("Invalid password")
         return check_password_hash(self.password, password)

@@ -29,12 +29,12 @@ class DatabaseUtils:
         self.drop_tables()
         self.create_tables()
         self.populate_db()
-        self.generate_user('user', 'user@user.com', 'user', False)
-        self.generate_user('admin', 'admin@admin.com', 'admin', True)
+        self.generate_user('user', 'user', 'user@user.com', False)
+        self.generate_user('admin', 'admin', 'admin@admin.com', True)
 
-    def generate_user(self, username, email, password, is_admin=False):
+    def generate_user(self, username, password, email, is_admin=False):
         db = self.SessionLocal()
-        user = User.create_user(username, email, password, is_admin)
+        user = User.create_user(username, password, email, is_admin)
         db.add(user)
         db.commit()
         db.close()
