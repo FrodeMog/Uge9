@@ -21,21 +21,35 @@ class BaseModel(Base):
 
     def __repr__(self):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
-    
+        
     @classmethod
-    async def upsert(cls, session, id, **kwargs):
+    async def upsert(cls, session, id=None, **kwargs):
         if id:
             # Update existing row
             stmt = update(cls).where(cls.id == id).values(**kwargs)
             await session.execute(stmt)
         else:
+            # Check if a row with the same name already exists
+            name = kwargs.get('name')
+            existing_row = (await session.execute(select(cls).where(cls.name == name))).scalar_one_or_none()
+            if existing_row:
+                raise ValueError(f"A row with the name '{name}' already exists.")
+            
             # Create new row
             row = cls(**kwargs)
             session.add(row)
-        await session.commit()
+            await session.commit()
+            return row
 
-        # Refresh the row to get the updated or created instance
+        # Refresh the row to get the updated instance
         row = (await session.execute(select(cls).where(cls.id == id))).scalar_one_or_none()
+        return row
+        
+    @classmethod
+    async def add(cls, session, **kwargs):
+        row = cls(**kwargs)
+        session.add(row)
+        await session.commit()
         return row
 
     @classmethod
@@ -166,8 +180,8 @@ class User(BaseModel):
         return email
     
     @classmethod
-    def create_user(cls, username, email, password):
-        user = cls(username=username, email=email, password=generate_password_hash(password))
+    def create_user(cls, username, email, password, is_admin=False):
+        user = cls(username=username, email=email, password=generate_password_hash(password), is_admin=is_admin)
         return user
     
     @classmethod
