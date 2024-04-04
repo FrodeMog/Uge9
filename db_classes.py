@@ -24,7 +24,12 @@ class BaseModel(Base):
         return str({column.name: getattr(self, column.name) for column in self.__table__.columns if hasattr(self, column.name)})
         
     @classmethod
-    async def upsert(cls, session, id=None, **kwargs):
+    async def upsert(cls, session, username, password, id=None, **kwargs):
+        try:
+            user = await User.authenticate_admin(User, session, username, password)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
         if id:
             # Update existing row
             stmt = update(cls).where(cls.id == id).values(**kwargs)

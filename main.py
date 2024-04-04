@@ -68,9 +68,9 @@ async def get_cereal_by_field_value(field: str, value: str, comparison: Optional
     return [CerealInDB.from_orm(cereal) for cereal in cereals]
 
 @app.post("/cereals", response_model=CerealInDB)
-async def upsert_cereal(cereal: CerealBase, id: Optional[int] = None, session: AsyncSession = Depends(get_db)):
+async def upsert_cereal(cereal: CerealBase, username: str, password: str, id: Optional[int] = None, session: AsyncSession = Depends(get_db)):
     try:
-        result = await Cereal.upsert(session, id, **cereal.dict())
+        result = await Cereal.upsert(session=session, username=username, password=password, id=id, **cereal.dict())
         if result:
             return CerealInDB.from_orm(result)
         else:
@@ -79,10 +79,10 @@ async def upsert_cereal(cereal: CerealBase, id: Optional[int] = None, session: A
         raise HTTPException(status_code=400, detail=str(e))
     
 @app.delete("/cereals/{cereal_id}")
-async def delete_cereal(cereal_id: int, username: str, password: str, session: AsyncSession = Depends(get_db)):
+async def delete_cereal(id: int, username: str, password: str, session: AsyncSession = Depends(get_db)):
     try:
-        result = await Cereal.delete(session, id=cereal_id, username=username, password=password)
-        return {"message": f"Cereal with id {cereal_id} deleted successfully"}
+        result = await Cereal.delete(session=session, id=id, username=username, password=password)
+        return {"message": f"Cereal with id {id} deleted successfully"}
     except ValueError as e:
         if "Invalid username or password" in str(e):
             raise HTTPException(status_code=401, detail="Invalid username or password")
