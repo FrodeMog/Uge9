@@ -59,7 +59,7 @@ Day 2|  | 6h | Up to 2h extra
 ✅| Add users to database  | 30m | Day 2
 ✅| User rights for POST/DELETE  | 1h | Day 2
 Day 3|  | 6h | Up to 2h extra
--| GET for pictures tied to IDs | 3h | Day 3
+✅| GET for pictures tied to IDs | 3h | Day 3
 -| Debug / Cleanup / Documentation | 3h | Day 3
 Total |  | 20h | 3 Days
 

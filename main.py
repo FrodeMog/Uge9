@@ -1,21 +1,25 @@
-from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi import FastAPI, HTTPException, status, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, APIKeyHeader
+from fastapi.staticfiles import StaticFiles
+
 from db_pydantic_classes import *
 from db_classes import *
-from typing import List
-import uvicorn
-from sqlalchemy.ext.asyncio import AsyncSession
-from db_classes import Cereal 
 from db_connect import DatabaseConnect
 from db_utils import DatabaseUtils
-from typing import List
-import json
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, APIKeyHeader
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from datetime import datetime, timedelta
+import json
+from typing import List
+import os
+
+import uvicorn
 #uvicorn main:app --reload
 #npx create-react-app storage-app
 #http://localhost:8000/docs
@@ -34,6 +38,7 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
 
 
 app = FastAPI()
+app.mount("/cereal-pictures", StaticFiles(directory="Cereal Pictures"), name="cereal-pictures")
 
 origins = [
     "http://localhost:3000",  # React's default port
@@ -110,6 +115,29 @@ async def http_exception_handler(request, exc):
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+
+@app.get("/cereals/{id}/picture")
+async def get_cereal_picture(id: int, response_type: str = "redirect", session: AsyncSession = Depends(get_db)):
+    cereal = await Cereal.get_by_id(session, id)
+    if cereal is None:
+        raise HTTPException(status_code=404, detail="Cereal not found")
+
+    # Remove spaces from the cereal name
+    cereal_name_no_spaces = cereal.name.replace(" ", "")
+
+    # Check all files in the directory
+    for filename in os.listdir("Cereal Pictures"):
+        # Remove spaces from the filename and compare with the cereal name
+        if filename.replace(" ", "").startswith(cereal_name_no_spaces):
+            if response_type.lower() == "redirect":
+                url_filename = filename.replace(" ", "%20")
+                return RedirectResponse(url=f"/cereal-pictures/{url_filename}")
+            elif response_type.lower() == "file":
+                return FileResponse(path=f"Cereal Pictures/{filename}", filename=filename)
+            else:
+                raise HTTPException(status_code=400, detail="Invalid response_type. Available types are 'redirect' and 'file'.")
+
+    raise HTTPException(status_code=404, detail="Cereal picture not found")
 
 @app.get("/cereals", response_model=List[CerealInDB])
 async def get_cereals(session: AsyncSession = Depends(get_db)):
