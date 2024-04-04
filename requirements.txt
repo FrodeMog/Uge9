@@ -6,3 +6,5 @@ PyMySQL==1.1.0
 SQLAlchemy==2.0.28
 uvicorn==0.29.0
 Werkzeug==3.0.2
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9

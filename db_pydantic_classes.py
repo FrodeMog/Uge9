@@ -4,6 +4,13 @@ from enum import Enum
 from datetime import datetime
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: str | None = None
+
 class MfrEnum(str, Enum):
     A = 'A'
     G = 'G'
