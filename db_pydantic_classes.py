@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from enum import Enum
 from datetime import datetime
+from typing import Dict, Any
 
 
 class Token(BaseModel):
@@ -66,6 +67,13 @@ class CerealInDB(BaseModel):
 
     class Config:
         orm_mode = True
+
+class FilterExample(BaseModel):
+    filters: Dict[str, Any] = Field(..., example={
+        "calories": ["lt", 100],
+        "sodium": ["lt", 200]
+    })
+    order: str = Field('asc', example='asc')
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, regex="^[A-Za-z0-9_]+$")

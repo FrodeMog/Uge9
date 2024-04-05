@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status, Depends, Security
+from fastapi import FastAPI, HTTPException, status, Depends, Security, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, APIKeyHeader
@@ -16,7 +16,7 @@ from passlib.context import CryptContext
 
 from datetime import datetime, timedelta
 import json
-from typing import List
+from typing import List, Dict, Tuple, Any, Optional
 import os
 
 import uvicorn
@@ -166,6 +166,17 @@ async def get_cereal_by_field_sorted(field: str, order: Optional[str] = 'asc', s
 @app.get("/cereals/{field}/{value}", response_model=List[CerealInDB])
 async def get_cereal_by_field_value(field: str, value: str, comparison: Optional[str] = 'eq', order: Optional[str] = 'asc', session: AsyncSession = Depends(get_db)):
     result = await Cereal.get_by_field_value(session, field, value, comparison, order)
+    if result:
+        return [CerealInDB.from_orm(cereal) for cereal in result]
+    else:
+        raise HTTPException(status_code=500, detail="Operation failed: Unknown error")
+
+@app.post("/cereals/filter", response_model=List[CerealInDB])
+async def get_cereal_by_filters(
+    filter: FilterExample = Body(...),
+    session: AsyncSession = Depends(get_db)
+):
+    result = await Cereal.get_by_filters(session, filter.filters, filter.order)
     if result:
         return [CerealInDB.from_orm(cereal) for cereal in result]
     else:

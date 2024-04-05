@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc, delete, update, inspect
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum, desc, delete, update, inspect, and_
 from sqlalchemy.orm import declarative_base, validates
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound, IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -83,6 +83,54 @@ class BaseModel(Base):
             return await cls.update(session, id, **kwargs)
         else:
             return await cls.add(session, **kwargs)
+
+    @classmethod
+    @error_handler
+    async def get_by_filters(cls, session, filters: dict, order: str = 'asc'):
+        comparison_mapping = {
+            'eq': lambda field, value: getattr(cls, field) == value,
+            'gt': lambda field, value: getattr(cls, field) > value,
+            'lt': lambda field, value: getattr(cls, field) < value,
+            'gte': lambda field, value: getattr(cls, field) >= value,
+            'lte': lambda field, value: getattr(cls, field) <= value,
+            'ne': lambda field, value: getattr(cls, field) != value,
+        }
+        comparison_descriptions = {
+            'eq': 'equal',
+            'gt': 'greater than',
+            'lt': 'less than',
+            'gte': 'greater than or equal to',
+            'lte': 'less than or equal to',
+            'ne': 'not equal',
+        }
+        order_mapping = {
+            'asc': lambda field: getattr(cls, field).asc(),
+            'desc': lambda field: getattr(cls, field).desc()
+        }
+        order_descriptions = {
+            'asc': 'ascending',
+            'desc': 'descending',
+        }
+
+        conditions = []
+        for field, (comparison, value) in filters.items():
+            if not hasattr(cls, field):
+                raise HTTPException(status_code=400, detail=f"Invalid order: {order}, Valid values are: {', '.join(f'{k}={v}' for k, v in order_descriptions.items())}")
+            if comparison not in comparison_mapping:
+                raise HTTPException(status_code=400, detail=f"Invalid comparison operator: {comparison}, Valid values are: {', '.join(f'{k}={v}' for k, v in comparison_descriptions.items())}")
+            conditions.append(comparison_mapping[comparison](field, value))
+
+        query = select(cls).where(and_(*conditions))
+
+        if filters and order in order_mapping:
+            query = query.order_by(order_mapping[order](list(filters.keys())[0]))
+
+        result = await session.execute(query)
+        results = result.scalars().all()
+
+        if not results:
+            raise HTTPException(status_code=404, detail=f"No {cls.__name__} found with given filters")
+        return results
 
     @classmethod
     @error_handler
