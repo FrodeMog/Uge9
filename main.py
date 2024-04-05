@@ -21,7 +21,7 @@ import os
 
 import uvicorn
 #uvicorn main:app --reload
-#npx create-react-app storage-app
+#npx create-react-app cereal-app
 #http://localhost:8000/docs
 
 with open('jwt_info.json') as f:
