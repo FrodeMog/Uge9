@@ -83,6 +83,13 @@ class BaseModel(Base):
             return await cls.update(session, id, **kwargs)
         else:
             return await cls.add(session, **kwargs)
+        
+    @classmethod
+    # Dont user error_handler decorator here
+    async def check_if_exists(cls, session, field, value):
+        query = select(cls).where(getattr(cls, field) == value)
+        result = await session.execute(query)
+        return result.scalars().first()
 
     @classmethod
     @error_handler
@@ -264,7 +271,7 @@ class User(BaseModel):
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(50), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
-    is_admin = Column(Boolean, default=False)
+    is_admin = Column(String(10), default="False")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -284,11 +291,16 @@ class User(BaseModel):
         return email
     
     @classmethod
-    def create_user(cls, username, password, email, is_admin=False):
+    @error_handler
+    async def create_user(cls, session, username, password, email, is_admin="False"):
         user = cls(username=username, password=generate_password_hash(password), email=email, is_admin=is_admin)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
         return user
     
     @classmethod
+    @error_handler
     async def authenticate(cls, username: str, password: str, session: AsyncSession):
         user = await session.execute(select(cls).where(cls.username == username))
         user = user.scalars().first()

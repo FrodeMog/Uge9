@@ -2,9 +2,11 @@ import json
 import pandas as pd
 import pymysql
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from db_classes import *
 from sqlalchemy import inspect
+from werkzeug.security import generate_password_hash, check_password_hash
+import asyncio
 
 class DatabaseUtils:
 
@@ -29,12 +31,12 @@ class DatabaseUtils:
         self.drop_tables()
         self.create_tables()
         self.populate_db()
-        self.generate_user('user', 'user', 'user@user.com', False)
-        self.generate_user('admin', 'admin', 'admin@admin.com', True)
+        self.generate_user('user', 'user', 'user@user.com', "False")
+        self.generate_user('admin', 'admin', 'admin@admin.com', "True")
 
-    def generate_user(self, username, password, email, is_admin=False):
+    def generate_user(self, username, password, email, is_admin="False"):
         db = self.SessionLocal()
-        user = User.create_user(username, password, email, is_admin)
+        user = User(username=username, email=email, password=generate_password_hash(password), is_admin=is_admin)
         db.add(user)
         db.commit()
         db.close()
