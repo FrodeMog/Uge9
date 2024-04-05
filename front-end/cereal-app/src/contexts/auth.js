@@ -1,8 +1,6 @@
-// Authentication react context
-
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../api/api.js';
-import { jwtDecode } from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 
 const AuthContext = createContext();
 
@@ -10,6 +8,14 @@ const AuthProvider = ({ children }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loggedInUser, setLoggedInUser] = useState(null);
+
+    useEffect(() => {
+        const storedToken = JSON.parse(localStorage.getItem('loggedInUser'));
+        if (storedToken) {
+            setLoggedInUser(storedToken);
+        }
+    }, []);
+
     const decodedToken = loggedInUser ? jwtDecode(loggedInUser) : null;
     const isAdmin = decodedToken && decodedToken.is_admin;
 
