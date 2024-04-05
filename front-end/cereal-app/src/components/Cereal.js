@@ -216,7 +216,7 @@ const Cereal = () => {
 
         return (
             <div>
-                <Toast onClose={() => setShowToast(false)} show={showToast} delay={300} autohide className="position-fixed top-50 start-50 translate-middle">
+                <Toast onClose={() => setShowToast(false)} show={showToast} delay={3000} autohide className="position-fixed top-50 start-50 translate-middle">
                     <Toast.Header>
                         <strong className="me-auto">Error</strong>
                     </Toast.Header>
