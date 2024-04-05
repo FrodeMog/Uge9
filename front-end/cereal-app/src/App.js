@@ -7,6 +7,7 @@ import { AuthContext } from './contexts/auth.js';
 // Import Components
 import NavBar from './components/NavBar.js';
 import Home from './components/Home.js';
+import Cereal from './components/Cereal.js';
 
 // Import React Router
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -23,6 +24,14 @@ const App = () => {
     <div className="App">
     <BrowserRouter>
       <NavBar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/cereal" element={
+            <UserProtectedRoute>
+              <Cereal />
+            </UserProtectedRoute>
+          } />
+        </Routes>
       </BrowserRouter>
 
     </div>

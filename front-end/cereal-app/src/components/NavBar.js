@@ -4,6 +4,7 @@ import Register from './Register';
 import Login from './Login';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
+
 const NavBar = () => {
     const navigate = useNavigate();
 
@@ -20,6 +21,7 @@ const NavBar = () => {
           <a className="navbar-brand" href="#" onClick={() => navigate('/')}>
             Cereal App
           </a>
+          {loggedInUser && <button className="btn btn-primary" onClick={() => navigate('/cereal')}>Cereal</button>}
               {loggedInUser ? (
                 <div>
                     <span className="navbar-text">

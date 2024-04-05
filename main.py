@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import json
 from typing import List, Dict, Tuple, Any, Optional
 import os
+import base64
 
 import uvicorn
 #uvicorn main:app --reload
@@ -157,13 +158,17 @@ async def get_cereal_picture(id: int, response_type: str = "redirect", session: 
     for filename in os.listdir("Cereal Pictures"):
         # Remove spaces from the filename and compare with the cereal name
         if filename.replace(" ", "").startswith(cereal_name_no_spaces):
-            if response_type.lower() == "redirect":
+            if response_type.lower() == "base64":
+                with open(f"Cereal Pictures/{filename}", 'rb') as f:
+                    base64image = base64.b64encode(f.read()).decode('utf-8')
+                return {"image": base64image}
+            elif response_type.lower() == "redirect":
                 url_filename = filename.replace(" ", "%20")
                 return RedirectResponse(url=f"/cereal-pictures/{url_filename}")
             elif response_type.lower() == "file":
                 return FileResponse(path=f"Cereal Pictures/{filename}", filename=filename)
             else:
-                raise HTTPException(status_code=400, detail="Invalid response_type. Available types are 'redirect' and 'file'.")
+                raise HTTPException(status_code=400, detail="Invalid response_type. Available types are 'base64', 'redirect', and 'file'.")
 
     raise HTTPException(status_code=404, detail="Cereal picture not found")
 
